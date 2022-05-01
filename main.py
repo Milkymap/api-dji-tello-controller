@@ -40,7 +40,7 @@ def prepare_data(ctx, path2data):
         'min_tracking_confidence': 0.5,
         'min_detection_confidence': 0.5
     }
-    char_codes = 'lruds'
+    char_codes = 'lrudswx'
     with mp_builder.Hands(**mp_builder_config) as detector:
         capture = cv2.VideoCapture(0)
         keep_capture = True 
@@ -64,7 +64,7 @@ def prepare_data(ctx, path2data):
                     distance_matrix /= np.max(distance_matrix)  # normalize between 0 and 1 
                     pixels = (distance_matrix * 255).astype('uint8')
                     cv2.imshow('001', cv2.resize(pixels, (640, 480)))
-                    if chr(key_code) in 'lruds':
+                    if chr(key_code) in char_codes:
                         accumulator.append((np.ravel(distance_matrix), char_codes.index(chr(key_code))))
                         print(key_code) 
                 
@@ -126,21 +126,6 @@ def train(path2data, nb_epochs, batch_size):
 @click.option('--path2network')
 def inference(path2network):
     
-    drone_api = Tello()
-    drone_api.connect()
-    battery = drone_api.get_battery()
-    logger.debug(f'battrery : {battery:03d} %')
-    drone_api.takeoff()
-    sleep(5)
-    drone_api.move_left(20)
-    sleep(1)
-    drone_api.move_right(20)
-    sleep(1)
-
-    drone_api.land()
-    
-    exit(1)
-
     W, H = 800, 800
 
     screen0 = '000'
@@ -164,8 +149,8 @@ def inference(path2network):
         'min_tracking_confidence': 0.5,
         'min_detection_confidence': 0.5
     }
-    char_codes = 'lruds'
-    commands = ['LEFT', 'RIGHT', 'UP', 'DOWN', 'STOP']
+    char_codes = 'lrudswx'
+    commands = ['LEFT', 'RIGHT', 'UP', 'DOWN', 'STOP', 'TAKEOF', 'LAND']
     map_code2command = dict(zip(char_codes, commands))
     with mp_builder.Hands(**mp_builder_config) as detector:
         capture = cv2.VideoCapture(0)
