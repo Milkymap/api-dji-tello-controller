@@ -18,6 +18,8 @@ from log import logger
 from model import MLP_Model
 from strategies import * 
 
+from google.protobuf.json_format import MessageToDict
+
 @click.group(chain=False, invoke_without_command=True)
 @click.option('--debug/--no-debug', default=False)
 @click.pass_context
@@ -121,88 +123,6 @@ def train(path2data, nb_epochs, batch_size):
     th.save(model.cpu(), 'network.th')
     logger.success('the model was saved ...!')
 
-
-@router_cmd.command()
-@click.option('--path2network')
-def inference(path2network):
-    
-    drone_api = Tello()
-    drone_api.connect()
-    battery = drone_api.get_battery()
-    logger.debug(f'battrery : {battery:03d} %')
-    drone_api.takeoff()
-    sleep(5)
-    drone_api.move_left(20)
-    sleep(1)
-    drone_api.move_right(20)
-    sleep(1)
-
-    drone_api.land()
-    
-    exit(1)
-
-    W, H = 800, 800
-
-    screen0 = '000'
-    create_window(screen0, (W, H), (100, 100))
-
-    screen1 = '001'
-    create_window(screen1, (W, H), (1400, 100))
-    
-    device = th.device('cuda:0' if th.cuda.is_available() else 'cpu')
-   
-    network = th.load(path2network)
-    network.to(device)
-    network.eval()
-    mp_drawing = mp.solutions.drawing_utils
-    mp_drawing_styles = mp.solutions.drawing_styles
-
-    mp_builder = mp.solutions.hands
-    mp_builder_config = {
-        'max_num_hands': 1,
-        'model_complexity': 0,
-        'min_tracking_confidence': 0.5,
-        'min_detection_confidence': 0.5
-    }
-    char_codes = 'lruds'
-    commands = ['LEFT', 'RIGHT', 'UP', 'DOWN', 'STOP']
-    map_code2command = dict(zip(char_codes, commands))
-    with mp_builder.Hands(**mp_builder_config) as detector:
-        capture = cv2.VideoCapture(0)
-        keep_capture = True 
-        while keep_capture:
-            key_code = cv2.waitKey(25) & 0xFF 
-            cap_status, bgr_frame = capture.read()
-            keep_capture = key_code != 27  # hit [escape] to end the loop 
-            if cap_status and keep_capture:
-                h, w, _ = bgr_frame.shape 
-                scaler = np.array([w, h])
-                rgb_frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2RGB)
-                response = detector.process(rgb_frame)
-                response_data = response.multi_hand_landmarks 
-                if response_data is not None:
-                    hand = response_data[0]
-                    draw_landmarks(mp_drawing, mp_drawing_styles, mp_builder, bgr_frame, hand)
-                    points = [ [pnt.x, pnt.y] for pnt in hand.landmark ]
-                    points = np.asarray(points, dtype=np.float16)
-                    rescaled_points = points * scaler 
-                    distance_matrix = build_matrix(rescaled_points)
-                    distance_matrix /= np.max(distance_matrix)  # normalize between 0 and 1 
-                    adjacency_matrix = (distance_matrix * 255).astype('uint8')
-                    
-                    cv2.imshow(screen1, cv2.resize(adjacency_matrix, (W, H)))
-
-                    input_batch = th.tensor(np.ravel(distance_matrix)).float()[None, ...]
-                    output = network(input_batch.to(device))
-                    output = th.squeeze(output).cpu()
-                    candidate = th.argmax(output)
-                    predicted_command = map_code2command[char_codes[candidate]]
-                    logger.success(f'COMMAND: {predicted_command:<30}')
-                cv2.imshow(screen0, bgr_frame)
-        # end while loop 
-
-    # end context manager 
-    
 
 if __name__ == '__main__':
     router_cmd(obj={})
