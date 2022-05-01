@@ -1,6 +1,5 @@
 import torch as th 
 import torch.nn as nn 
-
 import functools, itertools 
 
 class MLP_Model(nn.Module):
@@ -32,11 +31,7 @@ class MLP_Model(nn.Module):
         self.nb_layers = len(self.layers_array)
 
     def forward(self, X0):
-        XN = functools.reduce(
-            lambda Xi,Li: Li(Xi), 
-            self.layers_array, 
-            X0
-        )
+        XN = functools.reduce(lambda Xi,Li: Li(Xi), self.layers_array, X0)
         return XN 
 
 if __name__ == '__main__':
